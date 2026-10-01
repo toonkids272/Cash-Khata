@@ -2,6 +2,9 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import {
   signInWithPopup,
   signInWithRedirect,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
   getRedirectResult,
   onAuthStateChanged,
   signOut,
@@ -15,7 +18,7 @@ export interface AuthUser {
   email: string;
   displayName: string;
   photoURL?: string;
-  provider: 'google' | 'local';
+  provider: 'google' | 'email' | 'local';
 }
 
 interface AuthContextType {
@@ -28,7 +31,8 @@ interface AuthContextType {
   projectId: string;
   signInWithGoogle: () => Promise<void>;
   signInWithGoogleRedirect: () => Promise<void>;
-  signInWithFirebasePopup: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string, displayName?: string) => Promise<void>;
   signInAsLocalBusiness: (name?: string) => Promise<void>;
   signOutUser: () => Promise<void>;
   clearError: () => void;
@@ -91,12 +95,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (fbUser: FirebaseUser | null) => {
       if (fbUser) {
+        const isGoogle = fbUser.providerData.some((p) => p.providerId === 'google.com');
         const authUser: AuthUser = {
           uid: fbUser.uid,
           email: fbUser.email || '',
           displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'Business Owner',
           photoURL: fbUser.photoURL || undefined,
-          provider: 'google',
+          provider: isGoogle ? 'google' : 'email',
         };
         saveUserSession(authUser);
       }
@@ -197,12 +202,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [handleGoogleCredentialResponse, oAuthClientId]);
 
-  // Primary Google Sign-In: Google Identity Services (Direct Google OAuth, bypasses Firebase domain check)
+  // Primary Google Sign-In with GIS Token Client
   const signInWithGoogle = async () => {
     setError(null);
     setLoading(true);
 
-    // 1. Use Google Identity Services Token Client if available (does not check Firebase's domain list)
     if (window.google?.accounts?.oauth2 && oAuthClientId) {
       try {
         const client = window.google.accounts.oauth2.initTokenClient({
@@ -262,7 +266,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // 2. Fallback to Firebase Auth popup
+    // Fallback to Firebase Auth popup
     try {
       const result = await signInWithPopup(auth, googleAuthProvider);
       if (result.user) {
@@ -289,36 +293,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Direct Firebase Auth popup method
-  const signInWithFirebasePopup = async () => {
-    setError(null);
-    setLoading(true);
-    try {
-      const result = await signInWithPopup(auth, googleAuthProvider);
-      if (result.user) {
-        const authUser: AuthUser = {
-          uid: result.user.uid,
-          email: result.user.email || '',
-          displayName: result.user.displayName || result.user.email?.split('@')[0] || 'Business Owner',
-          photoURL: result.user.photoURL || undefined,
-          provider: 'google',
-        };
-        saveUserSession(authUser);
-      }
-    } catch (fbErr: any) {
-      if (fbErr.code === 'auth/unauthorized-domain') {
-        setError(
-          `Unauthorized Domain: "${hostname}" must be added to Firebase Console > Authentication > Settings > Authorized Domains.`
-        );
-      } else if (fbErr.code !== 'auth/popup-closed-by-user') {
-        setError(fbErr.message || 'Firebase sign-in failed.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Google Sign-In with Redirect (For Android Studio TWA / WebViews)
+  // Google Sign-In with Redirect (For mobile WebView / TWA)
   const signInWithGoogleRedirect = async () => {
     setError(null);
     setLoading(true);
@@ -333,6 +308,68 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setError(err.message || 'Failed to initiate Google Redirect.');
       }
+      setLoading(false);
+    }
+  };
+
+  // Firebase Email & Password Sign-In
+  const signInWithEmail = async (email: string, password: string) => {
+    setError(null);
+    setLoading(true);
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const authUser: AuthUser = {
+        uid: cred.user.uid,
+        email: cred.user.email || email,
+        displayName: cred.user.displayName || email.split('@')[0],
+        photoURL: cred.user.photoURL || undefined,
+        provider: 'email',
+      };
+      saveUserSession(authUser);
+    } catch (err: any) {
+      console.error('Email sign-in error:', err);
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+        setError('Invalid email or password. Please check your credentials.');
+      } else if (err.code === 'auth/wrong-password') {
+        setError('Incorrect password. Please try again.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Please enter a valid email address.');
+      } else {
+        setError(err.message || 'Email sign-in failed. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Firebase Email & Password Sign-Up
+  const signUpWithEmail = async (email: string, password: string, displayName?: string) => {
+    setError(null);
+    setLoading(true);
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      if (displayName && cred.user) {
+        await updateProfile(cred.user, { displayName }).catch(() => {});
+      }
+      const authUser: AuthUser = {
+        uid: cred.user.uid,
+        email: cred.user.email || email,
+        displayName: displayName || email.split('@')[0],
+        provider: 'email',
+      };
+      saveUserSession(authUser);
+    } catch (err: any) {
+      console.error('Email sign-up error:', err);
+      if (err.code === 'auth/email-already-in-use') {
+        setError('An account with this email already exists. Please sign in instead.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('Password should be at least 6 characters long.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Please enter a valid email address.');
+      } else {
+        setError(err.message || 'Registration failed. Please try again.');
+      }
+    } finally {
       setLoading(false);
     }
   };
@@ -376,7 +413,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         projectId,
         signInWithGoogle,
         signInWithGoogleRedirect,
-        signInWithFirebasePopup,
+        signInWithEmail,
+        signUpWithEmail,
         signInAsLocalBusiness,
         signOutUser,
         clearError,

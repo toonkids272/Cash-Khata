@@ -15,13 +15,18 @@ import {
   Smartphone,
   ChevronRight,
   Flame,
+  Mail,
+  KeyRound,
+  UserPlus,
+  LogIn,
 } from 'lucide-react';
 
 export const LoginView: React.FC = () => {
   const {
     signInWithGoogle,
     signInWithGoogleRedirect,
-    signInWithFirebasePopup,
+    signInWithEmail,
+    signUpWithEmail,
     signInAsLocalBusiness,
     loading,
     error,
@@ -32,18 +37,28 @@ export const LoginView: React.FC = () => {
     projectId,
   } = useAuth();
 
+  // Modals state
   const [isOriginModalOpen, setIsOriginModalOpen] = useState(false);
   const [isFirebaseModalOpen, setIsFirebaseModalOpen] = useState(false);
+
+  // Copy state
   const [copiedOrigin, setCopiedOrigin] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState(false);
   const [copiedClientId, setCopiedClientId] = useState(false);
 
+  // Email form state
+  const [isEmailSectionOpen, setIsEmailSectionOpen] = useState(false);
+  const [emailMode, setEmailMode] = useState<'signin' | 'signup'>('signin');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [businessName, setBusinessName] = useState('');
+
+  const cleanOrigin = (currentOrigin || window.location.origin).replace(/\/+$/, '');
+
   const handleCopyOrigin = () => {
-    if (currentOrigin) {
-      navigator.clipboard.writeText(currentOrigin);
-      setCopiedOrigin(true);
-      setTimeout(() => setCopiedOrigin(false), 2000);
-    }
+    navigator.clipboard.writeText(cleanOrigin);
+    setCopiedOrigin(true);
+    setTimeout(() => setCopiedOrigin(false), 2000);
   };
 
   const handleCopyDomain = () => {
@@ -59,6 +74,17 @@ export const LoginView: React.FC = () => {
       navigator.clipboard.writeText(oAuthClientId);
       setCopiedClientId(true);
       setTimeout(() => setCopiedClientId(false), 2000);
+    }
+  };
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) return;
+
+    if (emailMode === 'signin') {
+      await signInWithEmail(email.trim(), password);
+    } else {
+      await signUpWithEmail(email.trim(), password, businessName.trim() || undefined);
     }
   };
 
@@ -105,11 +131,11 @@ export const LoginView: React.FC = () => {
         <div className="w-full text-center mb-5">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-50 border border-sky-100 text-[#0288D1] text-xs font-semibold mb-2">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Google Account Authentication</span>
+            <span>Secure Cloud Access</span>
           </div>
           <h2 className="text-lg font-bold text-slate-900">Sign in to your Ledger</h2>
           <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-            Secure login protects your shop's accounts and syncs data to Google Cloud.
+            Choose your preferred sign-in method to sync and backup your books.
           </p>
         </div>
 
@@ -135,6 +161,16 @@ export const LoginView: React.FC = () => {
               </button>
             </div>
 
+            {isOriginMismatch && (
+              <button
+                onClick={() => setIsOriginModalOpen(true)}
+                className="w-full py-1.5 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+                <span>Fix Error 400 in Google Cloud Console (Checklist)</span>
+              </button>
+            )}
+
             {isUnauthorizedDomain && (
               <button
                 onClick={() => setIsFirebaseModalOpen(true)}
@@ -142,16 +178,6 @@ export const LoginView: React.FC = () => {
               >
                 <Flame className="w-3.5 h-3.5" />
                 <span>Fix Unauthorized Domain in Firebase Console</span>
-              </button>
-            )}
-
-            {isOriginMismatch && (
-              <button
-                onClick={() => setIsOriginModalOpen(true)}
-                className="w-full py-1.5 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
-              >
-                <HelpCircle className="w-3.5 h-3.5" />
-                <span>Fix Error 400: origin_mismatch (Guide)</span>
               </button>
             )}
           </div>
@@ -188,37 +214,160 @@ export const LoginView: React.FC = () => {
           <span>{loading ? 'Connecting to Google...' : 'Continue with Google Account'}</span>
         </button>
 
-        {/* Secondary: Android TWA / Redirect fallback */}
-        <div className="w-full mt-3 flex items-center justify-between text-xs text-slate-500">
+        {/* Helpful diagnostic links right below Google button */}
+        <div className="w-full mt-2.5 flex items-center justify-between text-xs text-slate-500">
+          <button
+            type="button"
+            onClick={() => setIsOriginModalOpen(true)}
+            className="text-[11px] text-amber-700 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+          >
+            <HelpCircle className="w-3.5 h-3.5" /> Diagnose Origin Mismatch
+          </button>
+
           <button
             type="button"
             onClick={signInWithGoogleRedirect}
-            className="text-[11px] text-[#0288D1] hover:underline font-semibold flex items-center gap-1"
+            className="text-[11px] text-[#0288D1] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
           >
-            <Smartphone className="w-3.5 h-3.5" /> Mobile Redirect Flow
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsFirebaseModalOpen(true)}
-            className="text-[11px] text-amber-700 hover:underline font-semibold flex items-center gap-1"
-          >
-            <Flame className="w-3.5 h-3.5" /> Firebase Domain Setup
+            <Smartphone className="w-3.5 h-3.5" /> Mobile Redirect
           </button>
         </div>
 
-        {/* Instant Local Ledger Bypass (So APK testing is never blocked) */}
+        {/* Divider */}
+        <div className="w-full flex items-center my-4">
+          <div className="flex-1 border-t border-slate-200"></div>
+          <span className="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            OR
+          </span>
+          <div className="flex-1 border-t border-slate-200"></div>
+        </div>
+
+        {/* EMAIL & PASSWORD AUTHENTICATION SECTION */}
+        <div className="w-full">
+          {!isEmailSectionOpen ? (
+            <button
+              type="button"
+              onClick={() => setIsEmailSectionOpen(true)}
+              className="w-full min-h-[46px] py-2.5 px-4 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-2xl font-bold text-xs shadow-2xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            >
+              <Mail className="w-4 h-4 text-[#0288D1]" />
+              <span>Sign In with Email &amp; Password (Instant)</span>
+            </button>
+          ) : (
+            <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200 space-y-3 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <div className="flex gap-2 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setEmailMode('signin')}
+                    className={`pb-1 transition-colors cursor-pointer ${
+                      emailMode === 'signin'
+                        ? 'text-[#0288D1] border-b-2 border-[#0288D1]'
+                        : 'text-slate-400 hover:text-slate-600'
+                    }`}
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEmailMode('signup')}
+                    className={`pb-1 transition-colors cursor-pointer ${
+                      emailMode === 'signup'
+                        ? 'text-[#0288D1] border-b-2 border-[#0288D1]'
+                        : 'text-slate-400 hover:text-slate-600'
+                    }`}
+                  >
+                    Create Account
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEmailSectionOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                >
+                  Hide
+                </button>
+              </div>
+
+              <form onSubmit={handleEmailSubmit} className="space-y-2.5">
+                {emailMode === 'signup' && (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-0.5">
+                      Business / Owner Name
+                    </label>
+                    <input
+                      type="text"
+                      value={businessName}
+                      onChange={(e) => setBusinessName(e.target.value)}
+                      placeholder="e.g. Sharma Kirana"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#0288D1]"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-0.5">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@business.com"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#0288D1]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-0.5">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#0288D1]"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-2.5 px-3 bg-[#0288D1] hover:bg-sky-600 active:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-60"
+                >
+                  {emailMode === 'signin' ? (
+                    <>
+                      <LogIn className="w-3.5 h-3.5" />
+                      <span>{loading ? 'Signing in...' : 'Sign In with Email'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>{loading ? 'Creating...' : 'Register New Account'}</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
+
+        {/* Instant Offline Access Button */}
         <div className="w-full mt-4 pt-3 border-t border-slate-100 flex flex-col items-center">
           <button
             type="button"
             onClick={() => signInAsLocalBusiness('My Business')}
-            className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+            className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
           >
             <span>Continue as Local Shop (Instant Offline Access)</span>
             <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
           </button>
           <span className="text-[10px] text-slate-400 mt-1">
-            Lets you test full cash book features immediately on Android
+            Zero sign-in setup needed to test all cash book features
           </span>
         </div>
 
@@ -226,7 +375,7 @@ export const LoginView: React.FC = () => {
         <div className="w-full mt-4 p-3 rounded-xl bg-sky-50/70 border border-sky-100 flex items-center gap-2.5 text-xs text-sky-900">
           <Cloud className="w-4 h-4 text-[#0288D1] shrink-0" />
           <span className="text-[11px] leading-tight">
-            Transactions save offline on your phone and sync instantly to Firestore upon sign-in.
+            Transactions save offline on your device and sync instantly to Firestore upon sign-in.
           </span>
         </div>
       </div>
@@ -238,6 +387,129 @@ export const LoginView: React.FC = () => {
           <span>Protected with Google Cloud Firestore</span>
         </div>
       </div>
+
+      {/* GOOGLE CLOUD ORIGIN_MISMATCH DIAGNOSTIC MODAL */}
+      {isOriginModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] border border-amber-200">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-amber-600 to-amber-700 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base">Google Cloud Console Origin Diagnostic</h3>
+                  <p className="text-[11px] text-amber-100">
+                    Why Error 400 origin_mismatch occurs and how to fix it
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsOriginModalOpen(false)}
+                className="p-1.5 rounded-full hover:bg-white/20 text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4 overflow-y-auto flex-1 text-xs text-slate-700">
+              {/* Critical Rule Warning */}
+              <div className="p-3 bg-amber-50 border border-amber-300 rounded-2xl text-amber-900 text-xs space-y-1">
+                <p className="font-bold flex items-center gap-1 text-amber-800">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  CRITICAL: NO Trailing Slash Rule
+                </p>
+                <p className="leading-relaxed text-[11px]">
+                  Google Cloud Console Authorized JavaScript origins will <strong>FAIL</strong> if you paste <code>...run.app/</code> with a slash at the end! It must be exact protocol + hostname without any trailing slash.
+                </p>
+              </div>
+
+              {/* Step 1: Clean Formatted Origin */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                  Step 1: Your Exact Clean Origin URI
+                </span>
+                <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-slate-200">
+                  <span className="font-mono text-xs text-slate-900 font-bold truncate flex-1 select-all">
+                    {cleanOrigin}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCopyOrigin}
+                    className="px-2.5 py-1.5 bg-[#0288D1] hover:bg-sky-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
+                  >
+                    {copiedOrigin ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedOrigin ? 'Copied' : 'Copy URI'}</span>
+                  </button>
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px] text-emerald-700">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Verified: Valid format (No trailing slash)</span>
+                </div>
+              </div>
+
+              {/* Step 2: Exact OAuth Client in Google Cloud */}
+              <div className="p-3.5 bg-sky-50/70 border border-sky-200 rounded-2xl space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-sky-800 block">
+                  Step 2: Google Cloud Console Credentials
+                </span>
+                <div className="space-y-1.5 text-xs text-sky-950 leading-relaxed">
+                  <p>1. Open Google Cloud Project: <strong>carbide-generator-svr20</strong>.</p>
+                  <p>2. Go to <strong>APIs &amp; Services &gt; Credentials</strong>.</p>
+                  <p>3. Edit your <strong>Web client</strong> (make sure it's the Web client, not Android):</p>
+                  <div className="flex items-center gap-2 bg-white/90 p-2 rounded-lg border border-sky-200 font-mono text-[11px] text-slate-800">
+                    <span className="truncate flex-1">{oAuthClientId}</span>
+                    <button
+                      onClick={handleCopyClientId}
+                      className="text-sky-700 hover:text-sky-900 p-0.5 cursor-pointer"
+                      title="Copy Client ID"
+                    >
+                      {copiedClientId ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <p>4. Under <strong>Authorized JavaScript origins</strong>, click <strong>+ ADD URI</strong> and paste:</p>
+                  <div className="p-2 bg-white rounded-lg border border-sky-200 font-mono text-[11px] text-slate-800 font-bold">
+                    {cleanOrigin}
+                  </div>
+                  <p>5. Under <strong>Authorized redirect URIs</strong>, ensure this is present:</p>
+                  <div className="p-2 bg-white rounded-lg border border-sky-200 font-mono text-[10px] text-slate-700">
+                    https://carbide-generator-svr20.firebaseapp.com/__/auth/handler
+                  </div>
+                  <p>6. Click <strong>SAVE</strong>.</p>
+                </div>
+
+                <a
+                  href={cloudConsoleUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex w-full py-2.5 px-3 bg-[#0288D1] hover:bg-sky-600 text-white rounded-xl text-xs font-bold items-center justify-center gap-1.5 shadow-xs transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Open Google Cloud Credentials</span>
+                </a>
+              </div>
+
+              {/* Propagation Notice */}
+              <div className="p-3 bg-slate-100 rounded-xl text-slate-600 text-[11px] leading-relaxed">
+                <strong>Google Edge Cache Notice:</strong> After clicking Save in Google Cloud Console, Google takes <strong>5 to 10 minutes</strong> to propagate the new origin across all authentication servers worldwide. You can use <strong>Email &amp; Password</strong> or <strong>Local Shop Access</strong> in the meantime!
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-[11px] text-slate-500">Wait 5 mins after saving</span>
+              <button
+                onClick={() => setIsOriginModalOpen(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FIREBASE AUTHORIZED DOMAINS MODAL */}
       {isFirebaseModalOpen && (
@@ -252,13 +524,13 @@ export const LoginView: React.FC = () => {
                 <div>
                   <h3 className="font-bold text-sm sm:text-base">Authorize Domain in Firebase Console</h3>
                   <p className="text-[11px] text-amber-100">
-                    Fixes auth/unauthorized-domain error in 60 seconds
+                    Fixes auth/unauthorized-domain error
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsFirebaseModalOpen(false)}
-                className="p-1.5 rounded-full hover:bg-white/20 text-white transition-colors"
+                className="p-1.5 rounded-full hover:bg-white/20 text-white transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -282,15 +554,12 @@ export const LoginView: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleCopyDomain}
-                    className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shrink-0 transition-colors"
+                    className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
                   >
                     {copiedDomain ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{copiedDomain ? 'Copied' : 'Copy Hostname'}</span>
                   </button>
                 </div>
-                <p className="text-[10px] text-slate-400">
-                  Do not include <code>https://</code> or trailing slashes when pasting into Firebase Authorized Domains.
-                </p>
               </div>
 
               {/* Step 2: Open Firebase Console Settings */}
@@ -321,114 +590,7 @@ export const LoginView: React.FC = () => {
               <span className="text-[11px] text-slate-500">Takes effect immediately</span>
               <button
                 onClick={() => setIsFirebaseModalOpen(false)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* GOOGLE CLOUD ORIGIN_MISMATCH HELPER MODAL */}
-      {isOriginModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] border border-amber-200">
-            {/* Modal Header */}
-            <div className="p-4 sm:p-5 bg-gradient-to-r from-amber-600 to-amber-700 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center">
-                  <ShieldCheck className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm sm:text-base">Fix Error 400: origin_mismatch</h3>
-                  <p className="text-[11px] text-amber-100">
-                    Google OAuth 2.0 Origin Authorization Guide
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsOriginModalOpen(false)}
-                className="p-1.5 rounded-full hover:bg-white/20 text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-5 space-y-4 overflow-y-auto flex-1 text-xs text-slate-700">
-              <p className="leading-relaxed">
-                Google blocks sign-in with <strong>origin_mismatch</strong> if the exact web domain loading your app is not listed in your Google Cloud Console OAuth Client.
-              </p>
-
-              {/* Step 1: Copy Current Origin */}
-              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
-                  Step 1: Your App's Exact Origin URI
-                </span>
-                <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-slate-200">
-                  <span className="font-mono text-xs text-slate-900 font-bold truncate flex-1 select-all">
-                    {currentOrigin || window.location.origin}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleCopyOrigin}
-                    className="px-2.5 py-1.5 bg-[#0288D1] hover:bg-sky-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 shrink-0 transition-colors"
-                  >
-                    {copiedOrigin ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedOrigin ? 'Copied' : 'Copy URI'}</span>
-                  </button>
-                </div>
-                <p className="text-[10px] text-slate-400">
-                  Copy this exact URI. It must be added to your Google Cloud Console.
-                </p>
-              </div>
-
-              {/* Step 2: Open Google Cloud Console */}
-              <div className="p-3.5 bg-sky-50/70 border border-sky-200 rounded-2xl space-y-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-sky-800 block">
-                  Step 2: Add to Google Cloud Console Credentials
-                </span>
-                <div className="space-y-1.5 text-xs text-sky-950 leading-relaxed">
-                  <p>1. Open Google Cloud Console: <strong>APIs &amp; Services &gt; Credentials</strong>.</p>
-                  <p>2. Under <strong>OAuth 2.0 Client IDs</strong>, click on your Web Client ID:</p>
-                  <div className="flex items-center gap-2 bg-white/90 p-2 rounded-lg border border-sky-200 font-mono text-[11px] text-slate-800">
-                    <span className="truncate flex-1">{oAuthClientId}</span>
-                    <button
-                      onClick={handleCopyClientId}
-                      className="text-sky-700 hover:text-sky-900 p-0.5"
-                      title="Copy Client ID"
-                    >
-                      {copiedClientId ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                  <p>3. Under <strong>Authorized JavaScript origins</strong>, click <strong>+ ADD URI</strong> and paste your copied Origin.</p>
-                  <p>4. Under <strong>Authorized redirect URIs</strong>, add:</p>
-                  <div className="bg-white/90 p-2 rounded-lg border border-sky-200 font-mono text-[10px] text-slate-700 space-y-1">
-                    <div>https://carbide-generator-svr20.firebaseapp.com/__/auth/handler</div>
-                    <div>{currentOrigin}/__/auth/handler</div>
-                  </div>
-                  <p>5. Click <strong>SAVE</strong> at the bottom of the page.</p>
-                </div>
-
-                <a
-                  href={cloudConsoleUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 inline-flex w-full py-2.5 px-3 bg-[#0288D1] hover:bg-sky-600 text-white rounded-xl text-xs font-bold items-center justify-center gap-1.5 shadow-xs transition-colors"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Open Google Cloud Console Credentials</span>
-                </a>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-[11px] text-slate-500">Takes 2-5 mins to propagate globally</span>
-              <button
-                onClick={() => setIsOriginModalOpen(false)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors"
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
               >
                 Done
               </button>

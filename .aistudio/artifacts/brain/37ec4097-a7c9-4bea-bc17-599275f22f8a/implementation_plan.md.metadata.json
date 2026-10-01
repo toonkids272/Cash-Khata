@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan to resolve Firebase auth/unauthorized-domain error by enabling direct Google Identity Services (GIS) token authentication and providing Firebase Console Authorized Domains configuration.",
-  "updatedAt":  "2026-10-01T19:38:49.793595620Z",
+  "summary":  "Plan to diagnose and resolve Google Cloud Console origin_mismatch while adding seamless Email & Password authentication alongside Google Sign-In.",
+  "updatedAt":  "2026-10-01T19:46:23.100386514Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

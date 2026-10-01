@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, doc, getDocFromServer, Firestore } from 'firebase/firestore';
 import firebaseConfigData from '../../firebase-applet-config.json';
 
 const firebaseConfig = {
@@ -24,10 +24,26 @@ googleAuthProvider.setCustomParameters({
   prompt: 'select_account',
 });
 
-// Initialize Cloud Firestore with dedicated databaseId
-export const db = firebaseConfigData.firestoreDatabaseId && firebaseConfigData.firestoreDatabaseId !== '(default)'
-  ? getFirestore(app, firebaseConfigData.firestoreDatabaseId)
-  : getFirestore(app);
+// Initialize Cloud Firestore with Android WebView long-polling and dedicated databaseId
+const databaseId =
+  firebaseConfigData.firestoreDatabaseId && firebaseConfigData.firestoreDatabaseId !== '(default)'
+    ? firebaseConfigData.firestoreDatabaseId
+    : undefined;
+
+let firestoreInstance: Firestore;
+try {
+  firestoreInstance = initializeFirestore(
+    app,
+    {
+      experimentalAutoDetectLongPolling: true,
+    },
+    databaseId
+  );
+} catch {
+  firestoreInstance = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
+}
+
+export const db = firestoreInstance;
 
 // Test Firestore connectivity on boot
 export async function testFirestoreConnection() {

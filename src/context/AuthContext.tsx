@@ -62,6 +62,16 @@ function getCleanUserUid(emailOrPhone: string): string {
   return `usr_${sanitized}`;
 }
 
+// Timeout wrapper for resilient mobile APK network operations
+function withTimeout<T>(promise: Promise<T>, ms: number = 3500): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('Network response timed out, using offline cache.')), ms)
+    ),
+  ]);
+}
+
 // Safely decode Google JWT ID Token payload if received
 function decodeJwt(token: string): any {
   try {
@@ -315,9 +325,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const pwdHash = await hashPassword(password);
 
     try {
-      // 1. Check Cloud Firestore for existing user profile
+      // 1. Check Cloud Firestore for existing user profile with timeout race
       const userDocRef = doc(db, 'users', uid);
-      const snap = await getDoc(userDocRef);
+      const snap = await withTimeout(getDoc(userDocRef), 3500);
 
       if (snap.exists()) {
         const data = snap.data();
@@ -418,9 +428,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const name = displayName?.trim() || cleanEmail.split('@')[0];
 
     try {
-      // Check if user already exists in Firestore
+      // Check if user already exists in Firestore with timeout race
       const userDocRef = doc(db, 'users', uid);
-      const snap = await getDoc(userDocRef);
+      const snap = await withTimeout(getDoc(userDocRef), 3500);
 
       if (snap.exists() && snap.data()?.passwordHash) {
         setError('An account with this email already exists. Please Sign In.');

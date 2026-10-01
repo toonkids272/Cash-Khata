@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan to diagnose and resolve Google Cloud Console origin_mismatch while adding seamless Email & Password authentication alongside Google Sign-In.",
-  "updatedAt":  "2026-10-01T19:46:23.100386514Z",
+  "summary":  "Plan to fix APK login and database errors when built via GitHub Actions by configuring relative Vite asset paths, enabling robust Firestore long-polling for Android WebViews, and adding resilient offline-first authentication.",
+  "updatedAt":  "2026-10-01T20:13:34.848302656Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

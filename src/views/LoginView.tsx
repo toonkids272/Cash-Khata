@@ -14,24 +14,28 @@ import {
   X,
   Smartphone,
   ChevronRight,
-  ArrowRight,
+  Flame,
 } from 'lucide-react';
 
 export const LoginView: React.FC = () => {
   const {
     signInWithGoogle,
     signInWithGoogleRedirect,
+    signInWithFirebasePopup,
     signInAsLocalBusiness,
     loading,
     error,
     clearError,
     currentOrigin,
+    hostname,
     oAuthClientId,
     projectId,
   } = useAuth();
 
   const [isOriginModalOpen, setIsOriginModalOpen] = useState(false);
+  const [isFirebaseModalOpen, setIsFirebaseModalOpen] = useState(false);
   const [copiedOrigin, setCopiedOrigin] = useState(false);
+  const [copiedDomain, setCopiedDomain] = useState(false);
   const [copiedClientId, setCopiedClientId] = useState(false);
 
   const handleCopyOrigin = () => {
@@ -39,6 +43,14 @@ export const LoginView: React.FC = () => {
       navigator.clipboard.writeText(currentOrigin);
       setCopiedOrigin(true);
       setTimeout(() => setCopiedOrigin(false), 2000);
+    }
+  };
+
+  const handleCopyDomain = () => {
+    if (hostname) {
+      navigator.clipboard.writeText(hostname);
+      setCopiedDomain(true);
+      setTimeout(() => setCopiedDomain(false), 2000);
     }
   };
 
@@ -53,6 +65,13 @@ export const LoginView: React.FC = () => {
   const cloudConsoleUrl = `https://console.cloud.google.com/apis/credentials?project=${encodeURIComponent(
     projectId || 'carbide-generator-svr20'
   )}`;
+
+  const firebaseAuthSettingsUrl = `https://console.firebase.google.com/project/${encodeURIComponent(
+    projectId || 'carbide-generator-svr20'
+  )}/authentication/settings`;
+
+  const isUnauthorizedDomain = error?.includes('Unauthorized Domain') || error?.includes('unauthorized-domain');
+  const isOriginMismatch = error?.includes('origin_mismatch') || error?.includes('400');
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 via-slate-50 to-white flex flex-col justify-between p-4 sm:p-6 text-slate-800">
@@ -94,7 +113,7 @@ export const LoginView: React.FC = () => {
           </p>
         </div>
 
-        {/* Error Alert with 1-click Origin Fix Trigger */}
+        {/* Error Alert with 1-click Fix Trigger */}
         {error && (
           <div className="w-full mb-4 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex flex-col gap-2">
             <div className="flex items-start justify-between gap-2">
@@ -116,7 +135,17 @@ export const LoginView: React.FC = () => {
               </button>
             </div>
 
-            {(error.includes('origin_mismatch') || error.includes('Unauthorized Domain') || error.includes('400')) && (
+            {isUnauthorizedDomain && (
+              <button
+                onClick={() => setIsFirebaseModalOpen(true)}
+                className="w-full py-1.5 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
+              >
+                <Flame className="w-3.5 h-3.5" />
+                <span>Fix Unauthorized Domain in Firebase Console</span>
+              </button>
+            )}
+
+            {isOriginMismatch && (
               <button
                 onClick={() => setIsOriginModalOpen(true)}
                 className="w-full py-1.5 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
@@ -166,15 +195,15 @@ export const LoginView: React.FC = () => {
             onClick={signInWithGoogleRedirect}
             className="text-[11px] text-[#0288D1] hover:underline font-semibold flex items-center gap-1"
           >
-            <Smartphone className="w-3.5 h-3.5" /> Mobile Browser Redirect Flow
+            <Smartphone className="w-3.5 h-3.5" /> Mobile Redirect Flow
           </button>
 
           <button
             type="button"
-            onClick={() => setIsOriginModalOpen(true)}
+            onClick={() => setIsFirebaseModalOpen(true)}
             className="text-[11px] text-amber-700 hover:underline font-semibold flex items-center gap-1"
           >
-            <HelpCircle className="w-3.5 h-3.5" /> Origin 400 Help
+            <Flame className="w-3.5 h-3.5" /> Firebase Domain Setup
           </button>
         </div>
 
@@ -209,6 +238,97 @@ export const LoginView: React.FC = () => {
           <span>Protected with Google Cloud Firestore</span>
         </div>
       </div>
+
+      {/* FIREBASE AUTHORIZED DOMAINS MODAL */}
+      {isFirebaseModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] border border-amber-200">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-amber-600 to-orange-600 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center">
+                  <Flame className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base">Authorize Domain in Firebase Console</h3>
+                  <p className="text-[11px] text-amber-100">
+                    Fixes auth/unauthorized-domain error in 60 seconds
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsFirebaseModalOpen(false)}
+                className="p-1.5 rounded-full hover:bg-white/20 text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4 overflow-y-auto flex-1 text-xs text-slate-700">
+              <p className="leading-relaxed">
+                Firebase Authentication requires every domain that launches Google Sign-In to be added to your project's <strong>Authorized domains</strong> list.
+              </p>
+
+              {/* Step 1: Copy Hostname */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                  Step 1: Copy Your Domain Hostname
+                </span>
+                <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-slate-200">
+                  <span className="font-mono text-xs text-slate-900 font-bold truncate flex-1 select-all">
+                    {hostname || window.location.hostname}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCopyDomain}
+                    className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shrink-0 transition-colors"
+                  >
+                    {copiedDomain ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedDomain ? 'Copied' : 'Copy Hostname'}</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Do not include <code>https://</code> or trailing slashes when pasting into Firebase Authorized Domains.
+                </p>
+              </div>
+
+              {/* Step 2: Open Firebase Console Settings */}
+              <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block">
+                  Step 2: Add in Firebase Console Settings
+                </span>
+                <div className="space-y-1.5 text-xs text-amber-950 leading-relaxed">
+                  <p>1. Open Firebase Console: <strong>Authentication &gt; Settings &gt; Authorized domains</strong>.</p>
+                  <p>2. Click <strong>Add domain</strong>.</p>
+                  <p>3. Paste <code>{hostname || window.location.hostname}</code> and click <strong>Add</strong>.</p>
+                </div>
+
+                <a
+                  href={firebaseAuthSettingsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex w-full py-2.5 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold items-center justify-center gap-1.5 shadow-xs transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Open Firebase Console Settings</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-[11px] text-slate-500">Takes effect immediately</span>
+              <button
+                onClick={() => setIsFirebaseModalOpen(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* GOOGLE CLOUD ORIGIN_MISMATCH HELPER MODAL */}
       {isOriginModalOpen && (
@@ -300,16 +420,6 @@ export const LoginView: React.FC = () => {
                   <ExternalLink className="w-3.5 h-3.5" />
                   <span>Open Google Cloud Console Credentials</span>
                 </a>
-              </div>
-
-              {/* Step 3: Firebase Authorized Domains */}
-              <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-1.5 text-emerald-950">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">
-                  Step 3: Firebase Authorized Domains
-                </span>
-                <p className="text-xs leading-relaxed">
-                  Also make sure <strong>{window.location.hostname}</strong> is added in <strong>Firebase Console &gt; Authentication &gt; Settings &gt; Authorized Domains</strong>.
-                </p>
               </div>
             </div>
 

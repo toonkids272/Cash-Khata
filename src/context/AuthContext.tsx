@@ -23,10 +23,12 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   currentOrigin: string;
+  hostname: string;
   oAuthClientId: string;
   projectId: string;
   signInWithGoogle: () => Promise<void>;
   signInWithGoogleRedirect: () => Promise<void>;
+  signInWithFirebasePopup: () => Promise<void>;
   signInAsLocalBusiness: (name?: string) => Promise<void>;
   signOutUser: () => Promise<void>;
   clearError: () => void;
@@ -76,6 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isGsiAvailable, setIsGsiAvailable] = useState<boolean>(false);
 
   const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   const oAuthClientId = firebaseConfigData.oAuthClientId || '';
   const projectId = firebaseConfigData.projectId || '';
 
@@ -194,13 +197,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [handleGoogleCredentialResponse, oAuthClientId]);
 
-  // Google Sign-In with standard Firebase Auth (Popup) + GIS fallback
+  // Primary Google Sign-In: Google Identity Services (Direct Google OAuth, bypasses Firebase domain check)
   const signInWithGoogle = async () => {
     setError(null);
     setLoading(true);
 
+    // 1. Use Google Identity Services Token Client if available (does not check Firebase's domain list)
+    if (window.google?.accounts?.oauth2 && oAuthClientId) {
+      try {
+        const client = window.google.accounts.oauth2.initTokenClient({
+          client_id: oAuthClientId,
+          scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email openid',
+          prompt: 'select_account',
+          callback: async (tokenResponse: any) => {
+            if (tokenResponse.error) {
+              if (tokenResponse.error === 'origin_mismatch' || tokenResponse.error_description?.includes('origin_mismatch')) {
+                setError(
+                  `Error 400: origin_mismatch. Register "${currentOrigin}" in Google Cloud Console > APIs & Services > Credentials.`
+                );
+              } else if (tokenResponse.error !== 'popup_closed_by_user') {
+                setError(tokenResponse.error_description || 'Google sign-in was cancelled.');
+              }
+              setLoading(false);
+              return;
+            }
+
+            try {
+              const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: {
+                  Authorization: `Bearer ${tokenResponse.access_token}`,
+                },
+              });
+
+              if (!userInfoRes.ok) {
+                throw new Error('Failed to verify profile with Google.');
+              }
+
+              const profile = await userInfoRes.json();
+              if (!profile.email) {
+                throw new Error('No verified email returned from Google.');
+              }
+
+              const authUser: AuthUser = {
+                uid: `google_${profile.sub || profile.email.replace(/[^a-zA-Z0-9]/g, '_')}`,
+                email: profile.email,
+                displayName: profile.name || profile.email.split('@')[0],
+                photoURL: profile.picture || undefined,
+                provider: 'google',
+              };
+
+              saveUserSession(authUser);
+            } catch (fetchErr: any) {
+              setError(fetchErr.message || 'Failed to complete Google Sign-In.');
+            } finally {
+              setLoading(false);
+            }
+          },
+        });
+
+        client.requestAccessToken({ prompt: 'select_account' });
+        return;
+      } catch (gisErr: any) {
+        console.warn('GIS TokenClient initiation failed, attempting Firebase popup fallback:', gisErr);
+      }
+    }
+
+    // 2. Fallback to Firebase Auth popup
     try {
-      // 1. Try Firebase official Google Auth popup
       const result = await signInWithPopup(auth, googleAuthProvider);
       if (result.user) {
         const authUser: AuthUser = {
@@ -215,88 +278,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
     } catch (fbErr: any) {
-      console.warn('Firebase signInWithPopup failed, testing GIS fallback:', fbErr);
-
-      // Check if popup was blocked or mobile origin error
-      if (
-        fbErr.code === 'auth/popup-blocked' ||
-        fbErr.code === 'auth/operation-not-supported-in-this-environment' ||
-        fbErr.code === 'auth/unauthorized-domain'
-      ) {
-        // Try fallback to Google Identity Services Token Client
-        if (window.google?.accounts?.oauth2 && oAuthClientId) {
-          try {
-            const client = window.google.accounts.oauth2.initTokenClient({
-              client_id: oAuthClientId,
-              scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email openid',
-              prompt: 'select_account',
-              callback: async (tokenResponse: any) => {
-                if (tokenResponse.error) {
-                  if (tokenResponse.error === 'origin_mismatch' || tokenResponse.error_description?.includes('origin_mismatch')) {
-                    setError(
-                      `Error 400: origin_mismatch. The origin "${currentOrigin}" must be registered under Authorized JavaScript Origins in Google Cloud Console.`
-                    );
-                  } else if (tokenResponse.error !== 'popup_closed_by_user') {
-                    setError(tokenResponse.error_description || 'Google sign-in was cancelled.');
-                  }
-                  setLoading(false);
-                  return;
-                }
-
-                try {
-                  const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                    headers: {
-                      Authorization: `Bearer ${tokenResponse.access_token}`,
-                    },
-                  });
-
-                  if (!userInfoRes.ok) {
-                    throw new Error('Failed to verify profile with Google.');
-                  }
-
-                  const profile = await userInfoRes.json();
-                  const authUser: AuthUser = {
-                    uid: `google_${profile.sub || profile.email.replace(/[^a-zA-Z0-9]/g, '_')}`,
-                    email: profile.email,
-                    displayName: profile.name || profile.email.split('@')[0],
-                    photoURL: profile.picture || undefined,
-                    provider: 'google',
-                  };
-
-                  saveUserSession(authUser);
-                } catch (fetchErr: any) {
-                  setError(fetchErr.message || 'Failed to complete Google Sign-In.');
-                } finally {
-                  setLoading(false);
-                }
-              },
-            });
-
-            client.requestAccessToken({ prompt: 'select_account' });
-            return;
-          } catch (gisErr: any) {
-            console.error('GIS token client error:', gisErr);
-          }
-        }
-      }
-
-      // Format clean error message
       if (fbErr.code === 'auth/unauthorized-domain') {
         setError(
-          `Unauthorized Domain: "${currentOrigin}" must be added to Firebase Console > Authentication > Settings > Authorized Domains.`
-        );
-      } else if (fbErr.message?.includes('origin_mismatch') || fbErr.code === 'auth/internal-error') {
-        setError(
-          `Error 400: origin_mismatch. Register "${currentOrigin}" in Google Cloud Console > APIs & Services > Credentials.`
+          `Unauthorized Domain: "${hostname}" must be added to Firebase Console > Authentication > Settings > Authorized Domains.`
         );
       } else if (fbErr.code !== 'auth/popup-closed-by-user') {
-        setError(fbErr.message || 'Sign in failed. Please try again.');
+        setError(fbErr.message || 'Google sign in failed.');
       }
       setLoading(false);
     }
   };
 
-  // Google Sign-In with Redirect (Optimized for Android Studio TWA / WebViews)
+  // Direct Firebase Auth popup method
+  const signInWithFirebasePopup = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const result = await signInWithPopup(auth, googleAuthProvider);
+      if (result.user) {
+        const authUser: AuthUser = {
+          uid: result.user.uid,
+          email: result.user.email || '',
+          displayName: result.user.displayName || result.user.email?.split('@')[0] || 'Business Owner',
+          photoURL: result.user.photoURL || undefined,
+          provider: 'google',
+        };
+        saveUserSession(authUser);
+      }
+    } catch (fbErr: any) {
+      if (fbErr.code === 'auth/unauthorized-domain') {
+        setError(
+          `Unauthorized Domain: "${hostname}" must be added to Firebase Console > Authentication > Settings > Authorized Domains.`
+        );
+      } else if (fbErr.code !== 'auth/popup-closed-by-user') {
+        setError(fbErr.message || 'Firebase sign-in failed.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Google Sign-In with Redirect (For Android Studio TWA / WebViews)
   const signInWithGoogleRedirect = async () => {
     setError(null);
     setLoading(true);
@@ -304,12 +326,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await signInWithRedirect(auth, googleAuthProvider);
     } catch (err: any) {
       console.error('Redirect sign-in error:', err);
-      setError(err.message || 'Failed to initiate Google Redirect.');
+      if (err.code === 'auth/unauthorized-domain') {
+        setError(
+          `Unauthorized Domain: "${hostname}" must be added to Firebase Console > Authentication > Settings > Authorized Domains.`
+        );
+      } else {
+        setError(err.message || 'Failed to initiate Google Redirect.');
+      }
       setLoading(false);
     }
   };
 
-  // Quick Start / Local Vyapari Sign-In (For offline/testing without blocking)
+  // Quick Start / Local Vyapari Sign-In
   const signInAsLocalBusiness = async (name: string = 'Vyapar Owner') => {
     setError(null);
     setLoading(true);
@@ -343,10 +371,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         error,
         currentOrigin,
+        hostname,
         oAuthClientId,
         projectId,
         signInWithGoogle,
         signInWithGoogleRedirect,
+        signInWithFirebasePopup,
         signInAsLocalBusiness,
         signOutUser,
         clearError,

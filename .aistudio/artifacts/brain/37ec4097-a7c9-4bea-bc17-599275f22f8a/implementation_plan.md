@@ -1,72 +1,48 @@
-# Implementation Plan: Paid Ad-Free Subscription (₹49 Micro-Pass & Dual Payout)
+# Implementation Plan: Fix Google OAuth 400 origin_mismatch for Android APK & Mobile
 
-Implement a paid subscription system for Cash Khata featuring a ₹49/month micro-pass, dual support for Google Play Billing and Direct UPI bank payouts, and guaranteed ad suppression across the entire app.
-
-## User Requirements & Choices
-1. **Pricing Structure**: Low-cost micro-pass at **₹49 / month** (with a discounted ₹399 / year value-saver option).
-2. **Payout Mechanism**: **Dual Support** for both Google Play In-App Billing (monthly wire deposit to bank) and Direct UPI QR / Intent (instant T+0 bank settlement).
-3. **Core Benefit**: 100% Ad-Free experience (suppressing AdMob Native, Interstitial, and App Open ads) plus Pro badge and priority cloud sync.
+Resolve the `Error 400: origin_mismatch` encountered when signing in from an Android Studio compiled APK or TWA package by configuring authorized origins in Google Cloud Console and hardening the mobile authentication handler.
 
 ---
 
-## Architecture & Implementation Steps
+## Root Cause Analysis
+- **Google Cloud OAuth 2.0 Policy**: The Web OAuth Client ID (`731992000609-ajgm3jni8hmp4c93rrbc6l5k9p9qaesu.apps.googleusercontent.com`) validates the HTTP `Origin` header against its list of **Authorized JavaScript origins**.
+- **Android APK / TWA Origin**: When opened via an Android Studio APK or TWA, the runtime origin matches either:
+  1. The deployed Cloud Run host (e.g. `https://ais-pre-yn5pphds2d2fhlcszl6lrq-79975215899.asia-east1.run.app`)
+  2. A custom domain configured in `build.gradle` (or `android-app://...`)
+  If the exact origin is not present in Google Cloud Console, Google immediately halts the flow with `Error 400: origin_mismatch`.
 
-### 1. Subscription State Management in `CashBookContext`
-- Add state variables:
-  - `isPro: boolean` (derived from active subscription or manual toggle)
-  - `subscriptionPlan: 'free' | 'monthly_49' | 'yearly_399'`
-  - `subscriptionExpiry: string | null`
-  - `activateProSubscription: (plan: 'monthly_49' | 'yearly_399', method: 'google_play' | 'upi', txId?: string) => void`
-  - `cancelSubscription: () => void`
-- Persist subscription status in `localStorage` and sync to Firestore under `users/{userId}/subscription` when signed in.
+---
 
-### 2. Ad-Free Enforcement
-- Audit all ad display points:
-  - `AppOpenAd.tsx`: Guard with `if (isPro) return null;`
-  - Native & Banner Ad placements: Verify `isPro` check before initializing or rendering AdMob units.
-  - Side navigation drawer and top bar: Replace "Pro Active" placeholder with dynamic subscription status, renewal countdown, and "Manage Subscription" action.
+## Proposed Changes
 
-### 3. Subscription Paywall & Checkout Modal (`SubscriptionModal.tsx`)
-Create a high-converting, professional checkout sheet:
-- **Plan Cards**:
-  - **₹49 / month** (Micro-Pass, popular for testing)
-  - **₹399 / year** (Save 32%, ₹33/month, best value)
-- **Features Highlighted**:
-  - 🚫 Zero advertisements anywhere in the app
-  - ⚡ Instant transaction loading with no interruptions
-  - 📄 Unlimited branded PDF statements & Excel exports
-  - ☁️ Priority Google Cloud Firestore sync
-- **Payment Method Switcher**:
-  - **Method 1: Google Play Billing** (Calls Digital Goods API / TWA In-App Billing SKU `cashkhata_pro_monthly_49`).
-  - **Method 2: Direct UPI (GPay / PhonePe / Paytm)**:
-    - Generates dynamic UPI intent links (`upi://pay?pa=...&pn=CashKhata&am=49&cu=INR&tn=CashKhataPro`)
-    - Displays scannable UPI QR code for direct bank-to-bank settlement (0% fees, deposited straight into your bank account).
-    - Reference number input with instant activation.
+### 1. Step-by-Step Google Cloud Console Origin Registration
+In Google Cloud Console under project **`carbide-generator-svr20`**:
+1. Navigate to: **APIs & Services > Credentials**.
+2. Click on the OAuth 2.0 Client ID: **`731992000609-ajgm3jni8hmp4c93rrbc6l5k9p9qaesu.apps.googleusercontent.com`**.
+3. Under **Authorized JavaScript origins**, click **+ ADD URI** and add:
+   - `https://ais-pre-yn5pphds2d2fhlcszl6lrq-79975215899.asia-east1.run.app`
+   - `https://ais-dev-yn5pphds2d2fhlcszl6lrq-79975215899.asia-east1.run.app`
+   - If using a custom domain in your Android Studio project (e.g., `https://mycashkhata.com`), add that domain as well.
+4. Under **Authorized redirect URIs**, ensure the following are added:
+   - `https://ai-studio-cashbookprovyapa-37ec4097-a7c9-4bea-bc17-599275f22f8a.firebaseapp.com/__/auth/handler`
+   - `https://carbide-generator-svr20.firebaseapp.com/__/auth/handler`
+   - `https://ais-pre-yn5pphds2d2fhlcszl6lrq-79975215899.asia-east1.run.app`
+5. Click **Save** (changes propagate globally across Google accounts in ~2-5 minutes).
 
-### 4. Merchant Payout Configuration (`SettingsView.tsx`)
-- Add a **"Merchant Payout & UPI Settings"** panel inside Settings:
-  - Input for your personal or business UPI ID (VPA, e.g., `yourname@okhdfcbank` or `yourbusiness@paytm`).
-  - Payee Name configuration.
-  - Instructions on linking your Indian Bank Account to Google Play Console Merchant Center for the Google Play Billing route.
+### 2. Client-Side Mobile OAuth Optimization (`AuthContext.tsx`)
+- Detect mobile and Android APK environments (`navigator.userAgent`, standalone display mode).
+- Handle Google Identity Services (GIS) / Token Client origin mismatches gracefully:
+  - If a 400 origin mismatch is detected, capture the current `window.location.origin` and show a clear, actionable dialog with a **"Copy Origin"** button.
+  - Implement Custom Tab / System Browser fallback so Android doesn't block OAuth with `disallowed_useragent`.
 
-### 5. Visual Indicators & Entry Points
-- Top AppBar: Add a golden Crown / "Upgrade to Pro" badge (or "Pro Member" badge when active).
-- Navigation Drawer: Prominent "Go Ad-Free (₹49/mo)" card.
+### 3. In-App Mobile Setup Helper Modal (`LoginView.tsx`)
+- Add a **"Troubleshoot Mobile Login & Origin Mismatch"** quick-action modal on the login screen.
+- Displays the current active origin (e.g. `https://ais-pre-yn5pphds2d2fhlcszl6lrq-79975215899.asia-east1.run.app`) with a 1-click **Copy Origin URI** button and direct link to Google Cloud Console Credentials.
+- Provides Android Studio `assetlinks.json` instructions for TWA Digital Asset Links verification.
 
 ---
 
 ## Verification Plan
-
-### Automated Verification
-- Run `lint_applet` to ensure type safety with new context variables and components.
-- Run `compile_applet` to confirm successful build.
-
-### User Acceptance Walkthrough
-1. Open the app; observe the "Go Ad-Free" crown badge in the top bar.
-2. Tap "Go Ad-Free" to launch the subscription sheet.
-3. Test selecting the **₹49/month** plan.
-4. Test the **Direct UPI Payment** option; verify QR code rendering and UPI intent link.
-5. Complete activation; verify that:
-   - "Pro Active" badge displays in the header and drawer.
-   - App Open ads, banners, and interstitials are completely disabled.
-   - Subscription expiry date is calculated accurately (30 days from activation).
+1. Run `lint_applet` and `compile_applet` to verify codebase integrity.
+2. Verify that `LoginView.tsx` shows the current origin and actionable Google Cloud Console instructions.
+3. Test authentication in mobile viewport and verify error handling for origin mismatch.

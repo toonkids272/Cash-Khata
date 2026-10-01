@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan for adding the Paid Ad-Free Subscription with ₹49/month micro-pass, dual Google Play Billing and Direct UPI bank settlement, and ad suppression throughout the application.",
-  "updatedAt":  "2026-09-30T20:53:21.732737090Z",
+  "summary":  "Plan to resolve Google OAuth Error 400: origin_mismatch for Android Studio compiled APK/TWA by registering authorized origins and optimizing the mobile sign-in flow.",
+  "updatedAt":  "2026-10-01T19:23:06.694387446Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

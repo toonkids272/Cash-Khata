@@ -1,0 +1,85 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile, settings, custom categories, and quick presets",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "settings": { "type": "object" },
+        "categories": { "type": "object" },
+        "presetNames": { "type": "array" }
+      },
+      "required": ["email", "updatedAt"]
+    },
+    "Account": {
+      "title": "Account",
+      "description": "A Cash Book or Bank ledger account belonging to a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["cash", "bank", "other"] },
+        "color": { "type": "string" },
+        "initialBalance": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "type", "initialBalance", "createdAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "An individual cash in or cash out transaction entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "accountId": { "type": "string" },
+        "type": { "type": "string", "enum": ["in", "out"] },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "partyName": { "type": "string" },
+        "category": { "type": "string" },
+        "paymentMode": { "type": "string" },
+        "remarks": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "isDeleted": { "type": "boolean" },
+        "deletedAt": { "type": "string" }
+      },
+      "required": ["id", "accountId", "type", "amount", "date", "partyName", "createdAt"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "Quick notebook entry or reminder note",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "isDone": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "text", "isDone", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile document containing user preferences and metadata"
+    },
+    "/users/{userId}/accounts/{accountId}": {
+      "schema": "Account",
+      "description": "Subcollection of Cash Book accounts belonging to the user"
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Subcollection of cash transactions for the user"
+    },
+    "/users/{userId}/notes/{noteId}": {
+      "schema": "Note",
+      "description": "Subcollection of personal notebook items for the user"
+    }
+  }
+}

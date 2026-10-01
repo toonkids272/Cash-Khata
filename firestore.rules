@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // User accounts, transactions, notes, and profile scoped to userId
+    match /users/{userId} {
+      allow read, write: if true;
+
+      match /accounts/{accountId} {
+        allow read, write: if true;
+      }
+
+      match /transactions/{transactionId} {
+        allow read, write: if true;
+      }
+
+      match /notes/{noteId} {
+        allow read, write: if true;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,162 @@
+{
+  "id": "com.cashkhata.vyaparledger",
+  "name": "Cash Khata - Vyapar Ledger & Cash Book",
+  "short_name": "Cash Khata",
+  "description": "Smart, offline-first Cash Khata ledger with multi-account tracking, cash denomination calculator, and PDF/Excel reports.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
+  "orientation": "portrait-primary",
+  "background_color": "#18794E",
+  "theme_color": "#18794E",
+  "categories": ["business", "finance", "productivity"],
+  "lang": "en",
+  "dir": "ltr",
+  "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ec4e53b7",
+  "prefer_related_applications": false,
+  "related_applications": [
+    {
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=com.cashkhata.vyaparledger",
+      "id": "com.cashkhata.vyaparledger"
+    },
+    {
+      "platform": "webapp",
+      "url": "https://ais-pre-yn5pphds2d2fhlcszl6lrq-79975215899.asia-east1.run.app/manifest.json"
+    }
+  ],
+  "scope_extensions": [
+    {
+      "origin": "https://ais-dev-yn5pphds2d2fhlcszl6lrq-79975215899.asia-east1.run.app"
+    },
+    {
+      "origin": "https://ais-pre-yn5pphds2d2fhlcszl6lrq-79975215899.asia-east1.run.app"
+    },
+    {
+      "origin": "https://accounts.google.com"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add Cash In",
+      "short_name": "Cash In",
+      "description": "Quickly record an incoming payment into Cash Khata ledger",
+      "url": "/?action=cash_in",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Add Cash Out",
+      "short_name": "Cash Out",
+      "description": "Quickly record an expense or outgoing payment from ledger",
+      "url": "/?action=cash_out",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Cash Calculator",
+      "short_name": "Calculator",
+      "description": "Count rupee currency denominations and notes in hand",
+      "url": "/?view=cash_calculator",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "PDF & Excel Reports",
+      "short_name": "Reports",
+      "description": "Generate and export financial statements and spreadsheets",
+      "url": "/?action=export_reports",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/app-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/screenshot-1-ledger.jpg",
+      "sizes": "720x1280",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Daily Ledger with Cash In and Cash Out Entries"
+    },
+    {
+      "src": "/screenshots/screenshot-2-books.jpg",
+      "sizes": "720x1280",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Manage Multiple Cash Books and Accounts"
+    },
+    {
+      "src": "/screenshots/screenshot-3-report.jpg",
+      "sizes": "720x1280",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Export Real PDF Statements and Excel Spreadsheets"
+    },
+    {
+      "src": "/screenshots/screenshot-4-pdf.jpg",
+      "sizes": "720x1280",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Printable Financial Cash Book Statements"
+    },
+    {
+      "src": "/screenshots/screenshot-5-login.jpg",
+      "sizes": "720x1280",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Secure Google Sign-In and Cloud Backup"
+    }
+  ]
+}

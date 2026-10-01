@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+  Google AdMob Configuration for Android Builds (APK / AAB)
+  
+  Instructions:
+  1. Place the <meta-data> tags inside the <application> element of AndroidManifest.xml.
+  2. Use these resource strings in your Kotlin/Java Activities when loading AdMob ads.
+-->
+<resources>
+    <!-- AdMob Application ID (Required in AndroidManifest.xml) -->
+    <meta-data
+        android:name="com.google.android.gms.ads.APPLICATION_ID"
+        android:value="ca-app-pub-2290313694944386~9326363627" />
+
+    <!-- Native Ad Unit ID -->
+    <string name="admob_native_ad_unit_id">ca-app-pub-2290313694944386/4138535992</string>
+
+    <!-- Interstitial Ad Unit ID -->
+    <string name="admob_interstitial_ad_unit_id">ca-app-pub-2290313694944386/3619661243</string>
+
+    <!-- App Open Ad Unit ID -->
+    <string name="admob_app_open_ad_unit_id">ca-app-pub-2290313694944386/4138535992</string>
+
+    <!-- Enable AdMob delay app measurement flag if needed -->
+    <meta-data
+        android:name="com.google.android.gms.ads.DELAY_APP_MEASUREMENT_INIT"
+        android:value="false" />
+</resources>

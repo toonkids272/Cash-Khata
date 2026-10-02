@@ -80,10 +80,8 @@ interface CashBookContextType {
     time: string;
     remarks?: string;
   }) => void;
-  // Categories
   categories: { in: string[]; out: string[] };
   addCategory: (type: 'in' | 'out', name: string) => void;
-  // Modals & Sheets
   isAddAccountModalOpen: boolean;
   setIsAddAccountModalOpen: (open: boolean) => void;
   isInstallModalOpen: boolean;
@@ -100,10 +98,8 @@ interface CashBookContextType {
   setSelectedTransaction: (tx: Transaction | null) => void;
   previewDoc: PreviewDoc | null;
   setPreviewDoc: (doc: PreviewDoc | null) => void;
-  // Cloud Sync
   isCloudSyncing: boolean;
   lastSyncedAt: Date | null;
-  // Subscription & Ad-Free Pro
   subscription: SubscriptionState;
   isPro: boolean;
   merchantSettings: MerchantSettings;
@@ -112,7 +108,6 @@ interface CashBookContextType {
   cancelSubscription: () => void;
   isSubscriptionModalOpen: boolean;
   setIsSubscriptionModalOpen: (open: boolean) => void;
-  // Backup / Restore / Sample data
   resetToInitialData: () => void;
   loadDemoData: () => void;
   importFullDatabase: (jsonData: string) => { success: boolean; error?: string };
@@ -136,18 +131,6 @@ export const DEFAULT_CATEGORIES = {
   ],
 };
 
-const STORAGE_KEYS = {
-  ACCOUNTS: 'cashbook_accounts_v2',
-  CURRENT_ACCOUNT: 'cashbook_current_acc_v2',
-  TRANSACTIONS: 'cashbook_transactions_v2',
-  SETTINGS: 'cashbook_settings_v2',
-  PRESETS: 'cashbook_presets_v2',
-  NOTES: 'cashbook_notes_v2',
-  CATEGORIES: 'cashbook_categories_v2',
-  SUBSCRIPTION: 'cashbook_subscription_v2',
-  MERCHANT_SETTINGS: 'cashbook_merchant_v2',
-};
-
 const DEFAULT_SUBSCRIPTION: SubscriptionState = {
   isPro: false,
   plan: 'free',
@@ -161,17 +144,49 @@ const DEFAULT_MERCHANT_SETTINGS: MerchantSettings = {
   merchantCode: '5411',
 };
 
+// Helper: Generate isolated, user-namespaced local storage key
+const getUserStorageKey = (uid: string, keyName: string): string => {
+  return `cashbook_u_${uid}_${keyName}_v3`;
+};
+
+// Clean legacy un-namespaced keys from prior versions
+const cleanupLegacyGlobalKeys = () => {
+  try {
+    const legacyKeys = [
+      'cashbook_accounts_v2',
+      'cashbook_current_acc_v2',
+      'cashbook_transactions_v2',
+      'cashbook_settings_v2',
+      'cashbook_presets_v2',
+      'cashbook_notes_v2',
+      'cashbook_categories_v2',
+      'cashbook_subscription_v2',
+      'cashbook_merchant_v2',
+    ];
+    legacyKeys.forEach((k) => localStorage.removeItem(k));
+  } catch (e) {
+    console.warn('Legacy key cleanup note:', e);
+  }
+};
+
 export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  const uid = user?.uid || '';
 
   // Cloud Sync State
   const [isCloudSyncing, setIsCloudSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
 
-  // 1. Accounts
+  // Clean legacy global un-namespaced keys on first boot
+  useEffect(() => {
+    cleanupLegacyGlobalKeys();
+  }, []);
+
+  // 1. Accounts (Isolated per user UID)
   const [accounts, setAccounts] = useState<Account[]>(() => {
+    if (!uid) return INITIAL_ACCOUNTS;
     try {
-      const saved = localStorage.getItem(STORAGE_KEYS.ACCOUNTS);
+      const saved = localStorage.getItem(getUserStorageKey(uid, 'accounts'));
       return saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
     } catch {
       return INITIAL_ACCOUNTS;
@@ -179,38 +194,42 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
 
   const [currentAccountId, setCurrentAccountId] = useState<string>(() => {
+    if (!uid) return '';
     try {
-      const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_ACCOUNT);
-      return saved || INITIAL_ACCOUNTS[0]?.id || '';
+      const saved = localStorage.getItem(getUserStorageKey(uid, 'current_acc'));
+      return saved || '';
     } catch {
-      return INITIAL_ACCOUNTS[0]?.id || '';
+      return '';
     }
   });
 
-  // 2. Transactions
+  // 2. Transactions (Isolated per user UID)
   const [allTransactions, setAllTransactions] = useState<Transaction[]>(() => {
+    if (!uid) return INITIAL_TRANSACTIONS;
     try {
-      const saved = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
+      const saved = localStorage.getItem(getUserStorageKey(uid, 'transactions'));
       return saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
     } catch {
       return INITIAL_TRANSACTIONS;
     }
   });
 
-  // 3. Settings
+  // 3. Settings (Isolated per user UID)
   const [settings, setSettings] = useState<BusinessSettings>(() => {
+    if (!uid) return INITIAL_SETTINGS;
     try {
-      const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+      const saved = localStorage.getItem(getUserStorageKey(uid, 'settings'));
       return saved ? JSON.parse(saved) : INITIAL_SETTINGS;
     } catch {
       return INITIAL_SETTINGS;
     }
   });
 
-  // 4. Presets & Notes
+  // 4. Presets & Notes (Isolated per user UID)
   const [presetNames, setPresetNames] = useState<string[]>(() => {
+    if (!uid) return INITIAL_PRESET_NAMES;
     try {
-      const saved = localStorage.getItem(STORAGE_KEYS.PRESETS);
+      const saved = localStorage.getItem(getUserStorageKey(uid, 'presets'));
       return saved ? JSON.parse(saved) : INITIAL_PRESET_NAMES;
     } catch {
       return INITIAL_PRESET_NAMES;
@@ -218,54 +237,103 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
 
   const [notes, setNotes] = useState<NoteItem[]>(() => {
+    if (!uid) return INITIAL_NOTES;
     try {
-      const saved = localStorage.getItem(STORAGE_KEYS.NOTES);
+      const saved = localStorage.getItem(getUserStorageKey(uid, 'notes'));
       return saved ? JSON.parse(saved) : INITIAL_NOTES;
     } catch {
       return INITIAL_NOTES;
     }
   });
 
-  // Categories
+  // 5. Categories (Isolated per user UID)
   const [categories, setCategories] = useState<{ in: string[]; out: string[] }>(() => {
+    if (!uid) return DEFAULT_CATEGORIES;
     try {
-      const saved = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
+      const saved = localStorage.getItem(getUserStorageKey(uid, 'categories'));
       return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES;
     } catch {
       return DEFAULT_CATEGORIES;
     }
   });
 
-  // Local storage caching effects
+  // 6. Subscription & Merchant Settings (Isolated per user UID)
+  const [subscription, setSubscription] = useState<SubscriptionState>(() => {
+    if (!uid) return DEFAULT_SUBSCRIPTION;
+    try {
+      const saved = localStorage.getItem(getUserStorageKey(uid, 'subscription'));
+      return saved ? JSON.parse(saved) : DEFAULT_SUBSCRIPTION;
+    } catch {
+      return DEFAULT_SUBSCRIPTION;
+    }
+  });
+
+  const [merchantSettings, setMerchantSettings] = useState<MerchantSettings>(() => {
+    if (!uid) return DEFAULT_MERCHANT_SETTINGS;
+    try {
+      const saved = localStorage.getItem(getUserStorageKey(uid, 'merchant'));
+      return saved ? JSON.parse(saved) : DEFAULT_MERCHANT_SETTINGS;
+    } catch {
+      return DEFAULT_MERCHANT_SETTINGS;
+    }
+  });
+
+  // Local storage caching effects (Strictly scoped by UID)
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories));
-  }, [categories]);
+    if (uid) {
+      localStorage.setItem(getUserStorageKey(uid, 'categories'), JSON.stringify(categories));
+    }
+  }, [categories, uid]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(accounts));
-  }, [accounts]);
+    if (uid) {
+      localStorage.setItem(getUserStorageKey(uid, 'accounts'), JSON.stringify(accounts));
+    }
+  }, [accounts, uid]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_ACCOUNT, currentAccountId);
-  }, [currentAccountId]);
+    if (uid) {
+      localStorage.setItem(getUserStorageKey(uid, 'current_acc'), currentAccountId);
+    }
+  }, [currentAccountId, uid]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(allTransactions));
-  }, [allTransactions]);
+    if (uid) {
+      localStorage.setItem(getUserStorageKey(uid, 'transactions'), JSON.stringify(allTransactions));
+    }
+  }, [allTransactions, uid]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
-  }, [settings]);
+    if (uid) {
+      localStorage.setItem(getUserStorageKey(uid, 'settings'), JSON.stringify(settings));
+    }
+  }, [settings, uid]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.PRESETS, JSON.stringify(presetNames));
-  }, [presetNames]);
+    if (uid) {
+      localStorage.setItem(getUserStorageKey(uid, 'presets'), JSON.stringify(presetNames));
+    }
+  }, [presetNames, uid]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
-  }, [notes]);
+    if (uid) {
+      localStorage.setItem(getUserStorageKey(uid, 'notes'), JSON.stringify(notes));
+    }
+  }, [notes, uid]);
 
-  // UI Navigation states
+  useEffect(() => {
+    if (uid) {
+      localStorage.setItem(getUserStorageKey(uid, 'subscription'), JSON.stringify(subscription));
+    }
+  }, [subscription, uid]);
+
+  useEffect(() => {
+    if (uid) {
+      localStorage.setItem(getUserStorageKey(uid, 'merchant'), JSON.stringify(merchantSettings));
+    }
+  }, [merchantSettings, uid]);
+
+  // View state & navigation
   const [activeView, setActiveView] = useState<ActiveView>('ledger');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
@@ -273,7 +341,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  // Modals
+  // Modals state
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -284,65 +352,30 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [previewDoc, setPreviewDoc] = useState<PreviewDoc | null>(null);
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
 
-  // Subscription state (Free vs Pro micro-pass)
-  const [subscription, setSubscription] = useState<SubscriptionState>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.SUBSCRIPTION);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.expiryDate && new Date(parsed.expiryDate).getTime() < Date.now()) {
-          return { isPro: false, plan: 'free', activatedAt: null, expiryDate: null };
-        }
-        return parsed;
-      }
-      return DEFAULT_SUBSCRIPTION;
-    } catch {
-      return DEFAULT_SUBSCRIPTION;
-    }
-  });
-
-  const [merchantSettings, setMerchantSettings] = useState<MerchantSettings>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.MERCHANT_SETTINGS);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (!parsed.upiId || parsed.upiId === 'toonkids272@okhdfcbank') {
-          parsed.upiId = 'zamura.digt@ybl';
-          parsed.payeeName = 'Zamura Digital';
-        }
-        return parsed;
-      }
-      return DEFAULT_MERCHANT_SETTINGS;
-    } catch {
-      return DEFAULT_MERCHANT_SETTINGS;
-    }
-  });
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SUBSCRIPTION, JSON.stringify(subscription));
-  }, [subscription]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.MERCHANT_SETTINGS, JSON.stringify(merchantSettings));
-  }, [merchantSettings]);
-
+  // Pro status evaluation
   const isPro = useMemo(() => {
     if (!subscription.isPro) return false;
-    if (subscription.expiryDate && new Date(subscription.expiryDate).getTime() < Date.now()) {
-      return false;
+    if (subscription.expiryDate) {
+      return new Date(subscription.expiryDate) > new Date();
     }
-    return true;
+    return false;
   }, [subscription]);
 
-  const activateProSubscription = (plan: SubscriptionPlan, method: PaymentMethod, txId?: string) => {
+  // Subscription activations
+  const activateProSubscription = (
+    plan: SubscriptionPlan,
+    method: PaymentMethod,
+    txId?: string
+  ) => {
     const now = new Date();
-    const expiry = new Date(now);
+    const expiry = new Date();
+
     if (plan === 'monthly_49') {
       expiry.setDate(expiry.getDate() + 30);
     } else if (plan === 'yearly_399') {
       expiry.setDate(expiry.getDate() + 365);
     } else {
-      expiry.setDate(expiry.getDate() + 3650);
+      expiry.setDate(expiry.getDate() + 30);
     }
 
     const newSub: SubscriptionState = {
@@ -355,7 +388,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
     setSubscription(newSub);
 
-    if (user) {
+    if (user?.uid) {
       const userDocRef = doc(db, 'users', user.uid);
       updateDoc(userDocRef, { subscription: newSub }).catch(() => {});
     }
@@ -369,7 +402,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       expiryDate: null,
     };
     setSubscription(canceled);
-    if (user) {
+    if (user?.uid) {
       const userDocRef = doc(db, 'users', user.uid);
       updateDoc(userDocRef, { subscription: canceled }).catch(() => {});
     }
@@ -378,7 +411,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const updateMerchantSettings = (newSettings: Partial<MerchantSettings>) => {
     setMerchantSettings((prev) => {
       const updated = { ...prev, ...newSettings };
-      if (user) {
+      if (user?.uid) {
         const userDocRef = doc(db, 'users', user.uid);
         updateDoc(userDocRef, { merchantSettings: updated }).catch(() => {});
       }
@@ -387,18 +420,20 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   // ==========================================
-  // REAL-TIME FIRESTORE SYNC WITH GOOGLE USER
+  // REAL-TIME FIRESTORE SYNC SCOPED TO USER UID
   // ==========================================
   useEffect(() => {
-    if (!user) return;
+    if (!user || !user.uid) return;
 
+    const currentUid = user.uid;
     setIsCloudSyncing(true);
 
     // 1. Sync User Profile / Settings
-    const userDocRef = doc(db, 'users', user.uid);
+    const userDocRef = doc(db, 'users', currentUid);
     const unsubUser = onSnapshot(
       userDocRef,
       (snap) => {
+        if (currentUid !== user.uid) return; // Discard stale snapshot on user switch
         if (snap.exists()) {
           const data = snap.data();
           if (data.settings) setSettings(data.settings);
@@ -407,7 +442,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           if (data.subscription) setSubscription(data.subscription);
           if (data.merchantSettings) setMerchantSettings(data.merchantSettings);
         } else {
-          // Initialize empty profile in Firestore
+          // Initialize clean empty profile for this new user in Firestore
           setDoc(
             userDocRef,
             {
@@ -415,11 +450,11 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               email: user.email || '',
               photoURL: user.photoURL || '',
               updatedAt: new Date().toISOString(),
-              settings,
-              categories,
-              presetNames,
-              subscription,
-              merchantSettings,
+              settings: INITIAL_SETTINGS,
+              categories: DEFAULT_CATEGORIES,
+              presetNames: INITIAL_PRESET_NAMES,
+              subscription: DEFAULT_SUBSCRIPTION,
+              merchantSettings: DEFAULT_MERCHANT_SETTINGS,
             },
             { merge: true }
           ).catch(console.error);
@@ -430,22 +465,27 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     );
 
-    // 2. Sync Accounts Subcollection
-    const accountsColRef = collection(db, 'users', user.uid, 'accounts');
+    // 2. Sync Accounts Subcollection (Scoped exclusively to currentUid)
+    const accountsColRef = collection(db, 'users', currentUid, 'accounts');
     const unsubAccounts = onSnapshot(
       accountsColRef,
       (snapshot) => {
+        if (currentUid !== user.uid) return; // Discard stale snapshot on user switch
         const cloudAccounts: Account[] = [];
         snapshot.forEach((d) => {
           cloudAccounts.push(d.data() as Account);
         });
-        cloudAccounts.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        cloudAccounts.sort(
+          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
         setAccounts(cloudAccounts);
         if (cloudAccounts.length > 0) {
           setCurrentAccountId((prev) => {
             if (prev && cloudAccounts.some((a) => a.id === prev)) return prev;
             return cloudAccounts[0].id;
           });
+        } else {
+          setCurrentAccountId('');
         }
       },
       (err) => {
@@ -453,16 +493,19 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     );
 
-    // 3. Sync Transactions Subcollection
-    const txColRef = collection(db, 'users', user.uid, 'transactions');
+    // 3. Sync Transactions Subcollection (Scoped exclusively to currentUid)
+    const txColRef = collection(db, 'users', currentUid, 'transactions');
     const unsubTx = onSnapshot(
       txColRef,
       (snapshot) => {
+        if (currentUid !== user.uid) return; // Discard stale snapshot on user switch
         const cloudTx: Transaction[] = [];
         snapshot.forEach((d) => {
           cloudTx.push(d.data() as Transaction);
         });
-        cloudTx.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        cloudTx.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
         setAllTransactions(cloudTx);
         setIsCloudSyncing(false);
         setLastSyncedAt(new Date());
@@ -473,16 +516,17 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     );
 
-    // 4. Sync Notes Subcollection
-    const notesColRef = collection(db, 'users', user.uid, 'notes');
+    // 4. Sync Notes Subcollection (Scoped exclusively to currentUid)
+    const notesColRef = collection(db, 'users', currentUid, 'notes');
     const unsubNotes = onSnapshot(
       notesColRef,
       (snapshot) => {
+        if (currentUid !== user.uid) return; // Discard stale snapshot on user switch
         const cloudNotes: NoteItem[] = [];
         snapshot.forEach((d) => {
           cloudNotes.push(d.data() as NoteItem);
         });
-        cloudNotes.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+        cloudNotes.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setNotes(cloudNotes);
       },
       (err) => {
@@ -496,59 +540,6 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       unsubTx();
       unsubNotes();
     };
-  }, [user]);
-
-  // ==========================================
-  // LOCAL DATA MIGRATION CHECK ON LOGIN
-  // ==========================================
-  // ==========================================
-  // AUTOMATIC SILENT LOCAL & CLOUD DATA MERGE (NO PERMISSION PROMPT)
-  // ==========================================
-  useEffect(() => {
-    if (!user) return;
-
-    const performAutomaticMerge = async () => {
-      try {
-        setIsCloudSyncing(true);
-
-        const localAccStr = localStorage.getItem(STORAGE_KEYS.ACCOUNTS);
-        const localTxStr = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
-        const localNotesStr = localStorage.getItem(STORAGE_KEYS.NOTES);
-
-        const localAccounts: Account[] = localAccStr ? JSON.parse(localAccStr) : [];
-        const localTransactions: Transaction[] = localTxStr ? JSON.parse(localTxStr) : [];
-        const localNotes: NoteItem[] = localNotesStr ? JSON.parse(localNotesStr) : [];
-
-        // If there is any local data, seamlessly merge it into the user's Cloud Firestore
-        if (localAccounts.length > 0 || localTransactions.length > 0 || localNotes.length > 0) {
-          const batch = writeBatch(db);
-
-          localAccounts.forEach((acc) => {
-            const ref = doc(db, 'users', user.uid, 'accounts', acc.id);
-            batch.set(ref, acc, { merge: true });
-          });
-
-          localTransactions.forEach((tx) => {
-            const ref = doc(db, 'users', user.uid, 'transactions', tx.id);
-            batch.set(ref, tx, { merge: true });
-          });
-
-          localNotes.forEach((note) => {
-            const ref = doc(db, 'users', user.uid, 'notes', note.id);
-            batch.set(ref, note, { merge: true });
-          });
-
-          await batch.commit();
-          setLastSyncedAt(new Date());
-        }
-      } catch (err) {
-        console.warn('Silent local & cloud merge sync notice:', err);
-      } finally {
-        setIsCloudSyncing(false);
-      }
-    };
-
-    performAutomaticMerge();
   }, [user]);
 
   // Current Account Fallback
@@ -574,7 +565,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return allTransactions.filter((t) => t.isDeleted);
   }, [allTransactions]);
 
-  // Transaction mutations
+  // Transaction mutations (All explicitly scoped to current user UID)
   const addTransaction = (tx: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => {
     const now = new Date().toISOString();
     const newTx: Transaction = {
@@ -585,7 +576,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       isDeleted: false,
     };
     setAllTransactions((prev) => [newTx, ...prev]);
-    if (user) {
+    if (user?.uid) {
       setDoc(doc(db, 'users', user.uid, 'transactions', newTx.id), newTx).catch(console.error);
     }
   };
@@ -595,7 +586,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setAllTransactions((prev) =>
       prev.map((t) => (t.id === id ? { ...t, ...updates, updatedAt: now } : t))
     );
-    if (user) {
+    if (user?.uid) {
       updateDoc(doc(db, 'users', user.uid, 'transactions', id), {
         ...updates,
         updatedAt: now,
@@ -608,7 +599,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setAllTransactions((prev) =>
       prev.map((t) => (t.id === id ? { ...t, isDeleted: true, deletedAt: now } : t))
     );
-    if (user) {
+    if (user?.uid) {
       updateDoc(doc(db, 'users', user.uid, 'transactions', id), {
         isDeleted: true,
         deletedAt: now,
@@ -620,7 +611,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setAllTransactions((prev) =>
       prev.map((t) => (t.id === id ? { ...t, isDeleted: false, deletedAt: undefined } : t))
     );
-    if (user) {
+    if (user?.uid) {
       updateDoc(doc(db, 'users', user.uid, 'transactions', id), {
         isDeleted: false,
         deletedAt: deleteField(),
@@ -630,7 +621,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const permanentDeleteTransaction = (id: string) => {
     setAllTransactions((prev) => prev.filter((t) => t.id !== id));
-    if (user) {
+    if (user?.uid) {
       deleteDoc(doc(db, 'users', user.uid, 'transactions', id)).catch(console.error);
     }
   };
@@ -638,7 +629,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const clearAllDeleted = () => {
     const toDelete = allTransactions.filter((t) => t.isDeleted);
     setAllTransactions((prev) => prev.filter((t) => !t.isDeleted));
-    if (user && toDelete.length > 0) {
+    if (user?.uid && toDelete.length > 0) {
       const batch = writeBatch(db);
       toDelete.forEach((t) => {
         batch.delete(doc(db, 'users', user.uid, 'transactions', t.id));
@@ -647,7 +638,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  // Accounts Actions
+  // Accounts Actions (All explicitly scoped to current user UID)
   const addAccount = (acc: Omit<Account, 'id' | 'createdAt'>) => {
     const newAcc: Account = {
       ...acc,
@@ -656,14 +647,14 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
     setAccounts((prev) => [...prev, newAcc]);
     setCurrentAccountId(newAcc.id);
-    if (user) {
+    if (user?.uid) {
       setDoc(doc(db, 'users', user.uid, 'accounts', newAcc.id), newAcc).catch(console.error);
     }
   };
 
   const updateAccount = (id: string, updates: Partial<Account>) => {
     setAccounts((prev) => prev.map((a) => (a.id === id ? { ...a, ...updates } : a)));
-    if (user) {
+    if (user?.uid) {
       updateDoc(doc(db, 'users', user.uid, 'accounts', id), updates).catch(console.error);
     }
   };
@@ -679,7 +670,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setCurrentAccountId('');
       }
     }
-    if (user) {
+    if (user?.uid) {
       deleteDoc(doc(db, 'users', user.uid, 'accounts', id)).catch(console.error);
     }
   };
@@ -690,7 +681,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setAccounts([]);
     setAllTransactions([]);
     setCurrentAccountId('');
-    if (user) {
+    if (user?.uid) {
       const batch = writeBatch(db);
       currentAccs.forEach((a) => batch.delete(doc(db, 'users', user.uid, 'accounts', a.id)));
       currentTxs.forEach((t) => batch.delete(doc(db, 'users', user.uid, 'transactions', t.id)));
@@ -698,7 +689,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  // Dual-Entry Transfer
+  // Dual-Entry Transfer (Scoped exclusively to current user UID)
   const executeTransfer = (transfer: {
     fromAccountId: string;
     toAccountId: string;
@@ -747,7 +738,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     setAllTransactions((prev) => [fromTx, toTx, ...prev]);
-    if (user) {
+    if (user?.uid) {
       setDoc(doc(db, 'users', user.uid, 'transactions', fromTx.id), fromTx).catch(console.error);
       setDoc(doc(db, 'users', user.uid, 'transactions', toTx.id), toTx).catch(console.error);
     }
@@ -763,8 +754,12 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         ...prev,
         [type]: [...list, trimmed],
       };
-      if (user) {
-        setDoc(doc(db, 'users', user.uid), { categories: updated, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
+      if (user?.uid) {
+        setDoc(
+          doc(db, 'users', user.uid),
+          { categories: updated, updatedAt: new Date().toISOString() },
+          { merge: true }
+        ).catch(console.error);
       }
       return updated;
     });
@@ -773,8 +768,12 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const updateSettings = (newSettings: Partial<BusinessSettings>) => {
     setSettings((prev) => {
       const updated = { ...prev, ...newSettings };
-      if (user) {
-        setDoc(doc(db, 'users', user.uid), { settings: updated, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
+      if (user?.uid) {
+        setDoc(
+          doc(db, 'users', user.uid),
+          { settings: updated, updatedAt: new Date().toISOString() },
+          { merge: true }
+        ).catch(console.error);
       }
       return updated;
     });
@@ -785,16 +784,24 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!trimmed || presetNames.includes(trimmed)) return;
     const updated = [...presetNames, trimmed];
     setPresetNames(updated);
-    if (user) {
-      setDoc(doc(db, 'users', user.uid), { presetNames: updated, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
+    if (user?.uid) {
+      setDoc(
+        doc(db, 'users', user.uid),
+        { presetNames: updated, updatedAt: new Date().toISOString() },
+        { merge: true }
+      ).catch(console.error);
     }
   };
 
   const deletePresetName = (name: string) => {
     const updated = presetNames.filter((n) => n !== name);
     setPresetNames(updated);
-    if (user) {
-      setDoc(doc(db, 'users', user.uid), { presetNames: updated, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
+    if (user?.uid) {
+      setDoc(
+        doc(db, 'users', user.uid),
+        { presetNames: updated, updatedAt: new Date().toISOString() },
+        { merge: true }
+      ).catch(console.error);
     }
   };
 
@@ -807,34 +814,45 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       isDone: false,
     };
     setNotes((prev) => [newNote, ...prev]);
-    if (user) {
+    if (user?.uid) {
       setDoc(doc(db, 'users', user.uid, 'notes', newNote.id), newNote).catch(console.error);
     }
   };
 
   const updateNote = (id: string, updates: Partial<NoteItem>) => {
     setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, ...updates } : n)));
-    if (user) {
+    if (user?.uid) {
       updateDoc(doc(db, 'users', user.uid, 'notes', id), updates).catch(console.error);
     }
   };
 
   const deleteNote = (id: string) => {
     setNotes((prev) => prev.filter((n) => n.id !== id));
-    if (user) {
+    if (user?.uid) {
       deleteDoc(doc(db, 'users', user.uid, 'notes', id)).catch(console.error);
     }
   };
 
   const resetToInitialData = () => {
     setAccounts(INITIAL_ACCOUNTS);
-    setCurrentAccountId(INITIAL_ACCOUNTS[0]?.id || '');
+    setCurrentAccountId('');
     setAllTransactions(INITIAL_TRANSACTIONS);
     setSettings(INITIAL_SETTINGS);
     setPresetNames(INITIAL_PRESET_NAMES);
     setNotes(INITIAL_NOTES);
-    Object.values(STORAGE_KEYS).forEach((k) => localStorage.removeItem(k));
-    if (user) {
+    if (user?.uid) {
+      const keys = [
+        'accounts',
+        'current_acc',
+        'transactions',
+        'settings',
+        'presets',
+        'notes',
+        'categories',
+        'subscription',
+        'merchant',
+      ];
+      keys.forEach((k) => localStorage.removeItem(getUserStorageKey(user.uid, k)));
       deleteAllAccounts();
     }
   };
@@ -844,7 +862,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setCurrentAccountId(DEMO_SAMPLE_ACCOUNTS[0]?.id || '');
     setAllTransactions(DEMO_SAMPLE_TRANSACTIONS);
     setActiveView('ledger');
-    if (user) {
+    if (user?.uid) {
       const batch = writeBatch(db);
       DEMO_SAMPLE_ACCOUNTS.forEach((a) => {
         batch.set(doc(db, 'users', user.uid, 'accounts', a.id), a);
@@ -859,7 +877,8 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const exportFullDatabase = () => {
     const data = {
       app: 'CashBookPro',
-      version: '2.0',
+      version: '3.0',
+      userId: user?.uid || 'anonymous',
       exportedAt: new Date().toISOString(),
       accounts,
       transactions: allTransactions,
@@ -885,7 +904,7 @@ export const CashBookProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (data.presetNames) setPresetNames(data.presetNames);
       if (data.notes) setNotes(data.notes);
 
-      if (user) {
+      if (user?.uid) {
         const batch = writeBatch(db);
         data.accounts.forEach((a: Account) => {
           batch.set(doc(db, 'users', user.uid, 'accounts', a.id), a);

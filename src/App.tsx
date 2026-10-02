@@ -197,16 +197,18 @@ const AppGatekeeper: React.FC = () => {
     return <LoginView />;
   }
 
-  return <MainContent />;
+  return (
+    <CashBookProvider key={user.uid}>
+      <AppOpenAd />
+      <MainContent />
+    </CashBookProvider>
+  );
 };
 
 export default function App() {
   return (
     <AuthProvider>
-      <CashBookProvider>
-        <AppOpenAd />
-        <AppGatekeeper />
-      </CashBookProvider>
+      <AppGatekeeper />
     </AuthProvider>
   );
 }

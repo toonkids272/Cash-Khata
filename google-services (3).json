@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "951323693012",
+    "project_id": "gen-lang-client-0005094746",
+    "storage_bucket": "gen-lang-client-0005094746.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:951323693012:android:f576c06da4da665d0ad041",
+        "android_client_info": {
+          "package_name": "com.cashkhata.vyaparledger2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAjLAHCde3xUsV7YAcbq_EfpS41j7vAPU0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

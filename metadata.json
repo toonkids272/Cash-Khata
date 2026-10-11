@@ -1,0 +1,8 @@
+{
+  "name": "Cash Book Pro - Vyapar Ledger & PDF/Excel Export",
+  "description": "Smart, offline-first Cash Book and Vyapar ledger with multi-account tracking, cash denomination calculator, and production-grade PDF and Excel statement generation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

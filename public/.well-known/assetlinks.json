@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.cashkhata.vyaparledger2",
+      "sha256_cert_fingerprints": [
+        "01:C7:CC:B8:A0:F0:B5:1F:9F:A8:0B:75:32:58:74:40:72:2B:E6:C6:17:7D:20:AE:0F:60:8D:E7:85:0D:2D:23",
+        "01:C7:CC:B8:A0:F0:B5:1F:9F:A8:0B:75:32:58:74:40:72:2B:E6:C6:17:7D:20:AE:0F:60:8D:E7:85:0D:2D:23"
+      ]
+    }
+  }
+]
